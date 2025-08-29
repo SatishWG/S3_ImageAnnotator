@@ -10,13 +10,18 @@
     <h1>Image Annotator</h1>
     <form id="upload-form" method="post" enctype="multipart/form-data">
         <input type="file" name="file" id="file-input">
-        <input type="text" name="objects" id="objects-input" placeholder="Enter objects separated by commas">
-        <button type="submit">Annotate</button>
+        <button type="submit">Upload</button>
     </form>
 
     <div id="image-container">
-        <img id="uploaded-image" src="" alt="Uploaded Image">
+        <img id="uploaded-image" src="" alt="Uploaded Image" style="display: none;">
+        <canvas id="annotation-canvas" style="display: none;"></canvas>
     </div>
+
+    <form id="annotate-form" style="display: none;">
+        <input type="text" id="objects-input" placeholder="Enter objects separated by commas">
+        <button type="submit">Annotate</button>
+    </form>
 
     <div id="results"></div>
 

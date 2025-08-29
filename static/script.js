@@ -1,40 +1,89 @@
 // This file contains the JavaScript code for the front-end functionality of the image annotator app.
 
-document.getElementById('upload-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const fileInput = document.getElementById('file-input');
-    const objectsInput = document.getElementById('objects-input');
-    const file = fileInput.files[0];
-    const objects = objectsInput.value;
+const uploadForm = document.getElementById('upload-form');
+const annotateForm = document.getElementById('annotate-form');
+const fileInput = document.getElementById('file-input');
+const objectsInput = document.getElementById('objects-input');
+const uploadedImage = document.getElementById('uploaded-image');
+const annotationCanvas = document.getElementById('annotation-canvas');
+const resultsDiv = document.getElementById('results');
 
+let imageUrl = '';
+
+uploadForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    const file = fileInput.files[0];
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('objects', objects);
 
     fetch('/upload', {
         method: 'POST',
         body: formData
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            document.getElementById('results').innerText = 'Error: ' + data.error;
-        } else {
-            // Display the uploaded image
-            const imagePath = 'uploads/' + data.filename;
-            document.getElementById('uploaded-image').src = imagePath;
-            document.getElementById('uploaded-image').style.display = 'block'; // Make sure the image is visible
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                resultsDiv.innerText = 'Error: ' + data.error;
+            } else {
+                imageUrl = data.image_url;
 
-            // Display detected objects (for demonstration)
-            let resultsText = 'Detected Objects:<br>';
-            for (const obj in data.detected_objects) {
-                resultsText += `${obj}: ${data.detected_objects[obj]}<br>`;
+                // Display the uploaded image
+                uploadedImage.src = imageUrl;
+                uploadedImage.style.display = 'block';
+
+                // Set up the canvas
+                uploadedImage.onload = () => {
+                    annotationCanvas.width = uploadedImage.width;
+                    annotationCanvas.height = uploadedImage.height;
+                    annotationCanvas.style.display = 'block';
+                    annotateForm.style.display = 'block';
+                };
             }
-            document.getElementById('results').innerHTML = resultsText;
-        }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            resultsDiv.innerText = 'An error occurred.';
+        });
+});
+
+annotateForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    const objects = objectsInput.value.split(',');
+
+    fetch('/annotate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ objects, image_url: imageUrl })
     })
-    .catch(error => {
-        console.error('Error:', error);
-        document.getElementById('results').innerText = 'An error occurred.';
-    });
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                resultsDiv.innerText = 'Error: ' + data.error;
+            } else {
+                const ctx = annotationCanvas.getContext('2d');
+                ctx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
+
+                // Draw annotations
+                const detectedObjects = data.detected_objects;
+                for (const obj in detectedObjects) {
+                    const [start, end] = detectedObjects[obj];
+                    ctx.strokeStyle = 'red';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(start[0], start[1], end[0] - start[0], end[1] - start[1]);
+                    ctx.font = '16px Arial';
+                    ctx.fillStyle = 'red';
+                    ctx.fillText(obj, start[0], start[1] - 5);
+                }
+
+                resultsDiv.innerHTML = 'Annotations added!';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            resultsDiv.innerText = 'An error occurred.';
+        });
 });

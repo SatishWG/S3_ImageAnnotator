@@ -1,13 +1,11 @@
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, render_template, jsonify, url_for
 import os
 from werkzeug.utils import secure_filename
-import cv2
-import numpy as np
 
 app = Flask(__name__)
 
 # Configure upload folder and allowed extensions
-UPLOAD_FOLDER = 'uploads'
+UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -19,10 +17,9 @@ def allowed_file(filename):
 
 def process_image(image_path, objects):
     # Dummy implementation for object detection
-    # In a real application, you would use a model to detect objects
     detected_objects = {}
     for obj in objects:
-        detected_objects[obj] = [(50, 50), (100, 100)]  # Dummy coordinates
+        detected_objects[obj] = [(50, 50), (150, 150)]  # Dummy coordinates
     return detected_objects
 
 @app.route('/')
@@ -41,13 +38,21 @@ def upload_file():
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
 
-        objects = request.form.get('objects').split(',')
-        detected_objects = process_image(file_path, objects)
-
-        # Return the filename to display the image
-        return jsonify({'filename': filename, 'detected_objects': detected_objects})
+        # Return the image URL
+        return jsonify({'image_url': url_for('static', filename=f'uploads/{filename}')})
 
     return jsonify({'error': 'File type not allowed'})
+
+@app.route('/annotate', methods=['POST'])
+def annotate():
+    data = request.json
+    objects = data.get('objects', [])
+    image_url = data.get('image_url', '')
+
+    # Dummy annotations
+    detected_objects = process_image(image_url, objects)
+
+    return jsonify({'detected_objects': detected_objects})
 
 if __name__ == '__main__':
     app.run(debug=True)
