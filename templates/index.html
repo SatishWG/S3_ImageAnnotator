@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Annotator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Image Annotator</h1>
+        <form id="upload-form">
+            <label for="image-upload">Upload Image:</label>
+            <input type="file" id="image-upload" accept="image/*" required>
+            <label for="object-list">Objects to Annotate (comma-separated):</label>
+            <input type="text" id="object-list" placeholder="e.g., cat, dog, car" required>
+            <button type="submit">Annotate</button>
+        </form>
+        <div id="result"></div>
+        <img id="uploaded-image" src="" alt="Uploaded Image" style="display:none;">
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
