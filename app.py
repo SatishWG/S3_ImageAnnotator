@@ -44,7 +44,8 @@ def upload_file():
         objects = request.form.get('objects').split(',')
         detected_objects = process_image(file_path, objects)
 
-        return jsonify({'detected_objects': detected_objects})
+        # Return the filename to display the image
+        return jsonify({'filename': filename, 'detected_objects': detected_objects})
 
     return jsonify({'error': 'File type not allowed'})
 

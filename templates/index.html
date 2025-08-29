@@ -7,18 +7,19 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <h1>Image Annotator</h1>
-        <form id="upload-form">
-            <label for="image-upload">Upload Image:</label>
-            <input type="file" id="image-upload" accept="image/*" required>
-            <label for="object-list">Objects to Annotate (comma-separated):</label>
-            <input type="text" id="object-list" placeholder="e.g., cat, dog, car" required>
-            <button type="submit">Annotate</button>
-        </form>
-        <div id="result"></div>
-        <img id="uploaded-image" src="" alt="Uploaded Image" style="display:none;">
+    <h1>Image Annotator</h1>
+    <form id="upload-form" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" id="file-input">
+        <input type="text" name="objects" id="objects-input" placeholder="Enter objects separated by commas">
+        <button type="submit">Annotate</button>
+    </form>
+
+    <div id="image-container">
+        <img id="uploaded-image" src="" alt="Uploaded Image">
     </div>
+
+    <div id="results"></div>
+
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

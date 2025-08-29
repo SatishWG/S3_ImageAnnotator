@@ -1,35 +1,40 @@
 // This file contains the JavaScript code for the front-end functionality of the image annotator app.
 
-document.getElementById('uploadForm').onsubmit = function(event) {
-    event.preventDefault(); // Prevent the form from submitting the default way
+document.getElementById('upload-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const fileInput = document.getElementById('file-input');
+    const objectsInput = document.getElementById('objects-input');
+    const file = fileInput.files[0];
+    const objects = objectsInput.value;
 
     const formData = new FormData();
-    const imageFile = document.getElementById('imageInput').files[0];
-    const objectList = document.getElementById('objectInput').value;
+    formData.append('file', file);
+    formData.append('objects', objects);
 
-    formData.append('image', imageFile);
-    formData.append('objects', objectList);
-
-    fetch('/annotate', {
+    fetch('/upload', {
         method: 'POST',
         body: formData
     })
     .then(response => response.json())
     .then(data => {
-        const resultDiv = document.getElementById('result');
-        resultDiv.innerHTML = ''; // Clear previous results
-
-        if (data.success) {
-            data.coordinates.forEach(coord => {
-                const coordElement = document.createElement('div');
-                coordElement.textContent = `Object: ${coord.object}, Coordinates: ${coord.coordinates}`;
-                resultDiv.appendChild(coordElement);
-            });
+        if (data.error) {
+            document.getElementById('results').innerText = 'Error: ' + data.error;
         } else {
-            resultDiv.textContent = 'Error: ' + data.message;
+            // Display the uploaded image
+            const imagePath = 'uploads/' + data.filename;
+            document.getElementById('uploaded-image').src = imagePath;
+            document.getElementById('uploaded-image').style.display = 'block'; // Make sure the image is visible
+
+            // Display detected objects (for demonstration)
+            let resultsText = 'Detected Objects:<br>';
+            for (const obj in data.detected_objects) {
+                resultsText += `${obj}: ${data.detected_objects[obj]}<br>`;
+            }
+            document.getElementById('results').innerHTML = resultsText;
         }
     })
     .catch(error => {
         console.error('Error:', error);
+        document.getElementById('results').innerText = 'An error occurred.';
     });
-};
+});
