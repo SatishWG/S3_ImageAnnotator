@@ -5,17 +5,74 @@ const annotateForm = document.getElementById('annotate-form');
 const fileInput = document.getElementById('file-input');
 const objectsInput = document.getElementById('objects-input');
 const uploadedImage = document.getElementById('uploaded-image');
-const resultsDiv = document.getElementById('results');
+const annotationCanvas = document.getElementById('annotation-canvas');
+const annotationsPanel = document.getElementById('annotations-panel');
 
 let imageUrl = '';
 
+function drawBoundingBoxes(detectedObjects) {
+    const canvas = annotationCanvas;
+    const ctx = canvas.getContext('2d');
+    
+    // Clear previous drawings
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Set canvas size to match image
+    canvas.width = uploadedImage.width;
+    canvas.height = uploadedImage.height;
+    
+    // Draw bounding boxes
+    Object.entries(detectedObjects).forEach(([label, instances]) => {
+        // Generate a random color for this object type
+        const hue = Math.random() * 360;
+        ctx.strokeStyle = `hsl(${hue}, 70%, 50%)`;
+        ctx.lineWidth = 2;
+        ctx.font = '16px Arial';
+        ctx.fillStyle = ctx.strokeStyle;
+        
+        instances.forEach((coords, index) => {
+            const [topLeft, bottomRight] = coords;
+            const width = bottomRight[0] - topLeft[0];
+            const height = bottomRight[1] - topLeft[1];
+            
+            // Draw rectangle
+            ctx.strokeRect(topLeft[0], topLeft[1], width, height);
+            
+            // Draw label
+            ctx.fillText(`${label} ${index + 1}`, topLeft[0], topLeft[1] - 5);
+        });
+    });
+}
+
+function updateAnnotationsPanel(detectedObjects) {
+    let html = '<h3>Detected Objects</h3>';
+    
+    Object.entries(detectedObjects).forEach(([label, instances]) => {
+        html += `<div class="annotation-item">
+            <strong>${label}</strong> (${instances.length} found)<br>`;
+        
+        instances.forEach((coords, index) => {
+            const [topLeft, bottomRight] = coords;
+            html += `<div style="margin-left: 10px;">
+                Instance ${index + 1}:<br>
+                Top-left: (${topLeft[0]}, ${topLeft[1]})<br>
+                Bottom-right: (${bottomRight[0]}, ${bottomRight[1]})
+            </div>`;
+        });
+        
+        html += '</div>';
+    });
+    
+    annotationsPanel.innerHTML = html;
+}
+
 uploadForm.addEventListener('submit', function (e) {
     e.preventDefault();
-
+    
     const file = fileInput.files[0];
     const formData = new FormData();
     formData.append('file', file);
-
+    
     fetch('/upload', {
         method: 'POST',
         body: formData
@@ -23,18 +80,18 @@ uploadForm.addEventListener('submit', function (e) {
     .then(response => response.json())
     .then(data => {
         if (data.error) {
-            resultsDiv.innerText = 'Error: ' + data.error;
+            annotationsPanel.innerText = 'Error: ' + data.error;
         } else {
             imageUrl = data.image_url;
             uploadedImage.src = imageUrl;
             uploadedImage.style.display = 'block';
             annotateForm.style.display = 'block';
-            resultsDiv.innerText = '';
+            annotationsPanel.innerText = '';
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        resultsDiv.innerText = 'An error occurred during upload.';
+        annotationsPanel.innerText = 'An error occurred during upload.';
     });
 });
 
@@ -44,12 +101,12 @@ annotateForm.addEventListener('submit', function (e) {
     const objects = objectsInput.value.split(',').map(obj => obj.trim()).filter(obj => obj);
     
     if (objects.length === 0) {
-        resultsDiv.innerText = 'Please enter at least one object to detect.';
+        annotationsPanel.innerText = 'Please enter at least one object to detect.';
         return;
     }
-
-    resultsDiv.innerText = 'Processing...';
-
+    
+    annotationsPanel.innerText = 'Processing...';
+    
     fetch('/annotate', {
         method: 'POST',
         headers: {
@@ -60,24 +117,16 @@ annotateForm.addEventListener('submit', function (e) {
     .then(response => response.json())
     .then(data => {
         if (data.error) {
-            resultsDiv.innerText = 'Error: ' + data.error;
+            annotationsPanel.innerText = 'Error: ' + data.error;
         } else if (data.warning) {
-            resultsDiv.innerHTML = `Warning: ${data.warning}`;
+            annotationsPanel.innerHTML = `Warning: ${data.warning}`;
         } else {
-            let resultHtml = '<h3>Detected Objects:</h3>';
-            for (const [label, instances] of Object.entries(data.detected_objects)) {
-                resultHtml += `<p><strong>${label}</strong>:<br>`;
-                instances.forEach((coords, index) => {
-                    resultHtml += `Instance ${index + 1}: Top-left (${coords[0][0]}, ${coords[0][1]}), ` +
-                                `Bottom-right (${coords[1][0]}, ${coords[1][1]})<br>`;
-                });
-                resultHtml += '</p>';
-            }
-            resultsDiv.innerHTML = resultHtml;
+            drawBoundingBoxes(data.detected_objects);
+            updateAnnotationsPanel(data.detected_objects);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        resultsDiv.innerText = 'An error occurred during annotation.';
+        annotationsPanel.innerText = 'An error occurred during annotation.';
     });
 });
