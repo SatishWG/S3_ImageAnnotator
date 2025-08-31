@@ -20,31 +20,35 @@ uploadForm.addEventListener('submit', function (e) {
         method: 'POST',
         body: formData
     })
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                resultsDiv.innerText = 'Error: ' + data.error;
-            } else {
-                imageUrl = data.image_url;
-
-                // Display the uploaded image
-                uploadedImage.src = imageUrl;
-                uploadedImage.style.display = 'block';
-
-                // Show the annotate form
-                annotateForm.style.display = 'block';
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            resultsDiv.innerText = 'An error occurred.';
-        });
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            resultsDiv.innerText = 'Error: ' + data.error;
+        } else {
+            imageUrl = data.image_url;
+            uploadedImage.src = imageUrl;
+            uploadedImage.style.display = 'block';
+            annotateForm.style.display = 'block';
+            resultsDiv.innerText = '';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        resultsDiv.innerText = 'An error occurred during upload.';
+    });
 });
 
 annotateForm.addEventListener('submit', function (e) {
     e.preventDefault();
+    
+    const objects = objectsInput.value.split(',').map(obj => obj.trim()).filter(obj => obj);
+    
+    if (objects.length === 0) {
+        resultsDiv.innerText = 'Please enter at least one object to detect.';
+        return;
+    }
 
-    const objects = objectsInput.value.split(',');
+    resultsDiv.innerText = 'Processing...';
 
     fetch('/annotate', {
         method: 'POST',
@@ -53,23 +57,27 @@ annotateForm.addEventListener('submit', function (e) {
         },
         body: JSON.stringify({ objects, image_url: imageUrl })
     })
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                resultsDiv.innerText = 'Error: ' + data.error;
-            } else {
-                // Display detected object coordinates
-                const detectedObjects = data.detected_objects;
-                let resultsText = 'Detected Objects:<br>';
-                for (const obj in detectedObjects) {
-                    const [start, end] = detectedObjects[obj];
-                    resultsText += `${obj}: Start(${start[0]}, ${start[1]}), End(${end[0]}, ${end[1]})<br>`;
-                }
-                resultsDiv.innerHTML = resultsText;
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            resultsDiv.innerText = 'Error: ' + data.error;
+        } else if (data.warning) {
+            resultsDiv.innerHTML = `Warning: ${data.warning}`;
+        } else {
+            let resultHtml = '<h3>Detected Objects:</h3>';
+            for (const [label, instances] of Object.entries(data.detected_objects)) {
+                resultHtml += `<p><strong>${label}</strong>:<br>`;
+                instances.forEach((coords, index) => {
+                    resultHtml += `Instance ${index + 1}: Top-left (${coords[0][0]}, ${coords[0][1]}), ` +
+                                `Bottom-right (${coords[1][0]}, ${coords[1][1]})<br>`;
+                });
+                resultHtml += '</p>';
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            resultsDiv.innerText = 'An error occurred.';
-        });
+            resultsDiv.innerHTML = resultHtml;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        resultsDiv.innerText = 'An error occurred during annotation.';
+    });
 });

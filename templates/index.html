@@ -4,26 +4,50 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Annotator</title>
+    <style>
+        #image-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px 0;
+        }
+        #uploaded-image {
+            max-width: 800px;
+            max-height: 600px;
+            object-fit: contain;
+        }
+        .form-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        #objects-input {
+            width: 300px;
+            padding: 5px;
+        }
+    </style>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h1>Image Annotator</h1>
-    <form id="upload-form" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" id="file-input">
-        <button type="submit">Upload</button>
-    </form>
+    <h1 style="text-align: center;">Image Annotator</h1>
+    <div class="form-container">
+        <form id="upload-form" method="post" enctype="multipart/form-data">
+            <input type="file" name="file" id="file-input">
+            <button type="submit">Upload</button>
+        </form>
+    </div>
 
     <div id="image-container">
         <img id="uploaded-image" src="" alt="Uploaded Image" style="display: none;">
-        <canvas id="annotation-canvas" style="display: none;"></canvas>
     </div>
 
-    <form id="annotate-form" style="display: none;">
-        <input type="text" id="objects-input" placeholder="Enter objects separated by commas">
-        <button type="submit">Annotate</button>
-    </form>
+    <div class="form-container">
+        <form id="annotate-form" style="display: none;">
+            <input type="text" id="objects-input" placeholder="Enter objects separated by commas (e.g., orange, banana, apple)">
+            <button type="submit">Annotate</button>
+        </form>
+    </div>
 
-    <div id="results"></div>
+    <div id="results" style="text-align: center;"></div>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>

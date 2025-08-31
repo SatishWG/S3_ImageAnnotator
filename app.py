@@ -35,10 +35,8 @@ def process_image(image_path, objects):
         # Process the results
         detected_objects = {}
         
-        # Get the original image size for coordinate calculation
-        with Image.open(image_path) as img:
-            img_width, img_height = img.size
-            print(f"Original image size: {img.size}")
+        # Clean up the input objects (strip whitespace and convert to lowercase)
+        clean_objects = [obj.strip().lower() for obj in objects]
         
         # Look for mask files in the output directory
         mask_files = [f for f in os.listdir(output_dir) if f.endswith('_mask.png')]
@@ -46,31 +44,24 @@ def process_image(image_path, objects):
         
         for filename in mask_files:
             # Extract object label from filename (everything before first underscore)
-            label = filename.split('_')[0]
-            print(f"Processing mask for label: {label}")
+            label = filename.split('_')[0].lower()
             
             # If this object was requested by the user
-            if any(obj.lower() in label.lower() for obj in objects):
-                # Get the mask image path
+            if any(obj in label for obj in clean_objects):
+                original_label = filename.split('_')[0]  # Keep original case for display
                 mask_path = os.path.join(output_dir, filename)
                 
-                # Open the mask image to get its bounding box
                 with Image.open(mask_path) as mask:
                     bbox = mask.getbbox()  # Returns (left, top, right, bottom)
                     if bbox:
-                        print(f"Found bounding box for {label}: {bbox}")
+                        if original_label not in detected_objects:
+                            detected_objects[original_label] = []
                         
-                        # Initialize list for this label if it doesn't exist
-                        if label not in detected_objects:
-                            detected_objects[label] = []
-                            
-                        # Append coordinates as [(top-left), (bottom-right)]
-                        detected_objects[label].append([
+                        detected_objects[original_label].append([
                             (bbox[0], bbox[1]),  # top-left
                             (bbox[2], bbox[3])   # bottom-right
                         ])
         
-        print(f"Detected objects: {detected_objects}")
         return detected_objects
     
     except Exception as e:
