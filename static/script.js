@@ -5,7 +5,6 @@ const annotateForm = document.getElementById('annotate-form');
 const fileInput = document.getElementById('file-input');
 const objectsInput = document.getElementById('objects-input');
 const uploadedImage = document.getElementById('uploaded-image');
-const annotationCanvas = document.getElementById('annotation-canvas');
 const resultsDiv = document.getElementById('results');
 
 let imageUrl = '';
@@ -32,13 +31,8 @@ uploadForm.addEventListener('submit', function (e) {
                 uploadedImage.src = imageUrl;
                 uploadedImage.style.display = 'block';
 
-                // Set up the canvas
-                uploadedImage.onload = () => {
-                    annotationCanvas.width = uploadedImage.width;
-                    annotationCanvas.height = uploadedImage.height;
-                    annotationCanvas.style.display = 'block';
-                    annotateForm.style.display = 'block';
-                };
+                // Show the annotate form
+                annotateForm.style.display = 'block';
             }
         })
         .catch(error => {
@@ -64,22 +58,14 @@ annotateForm.addEventListener('submit', function (e) {
             if (data.error) {
                 resultsDiv.innerText = 'Error: ' + data.error;
             } else {
-                const ctx = annotationCanvas.getContext('2d');
-                ctx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
-
-                // Draw annotations
+                // Display detected object coordinates
                 const detectedObjects = data.detected_objects;
+                let resultsText = 'Detected Objects:<br>';
                 for (const obj in detectedObjects) {
                     const [start, end] = detectedObjects[obj];
-                    ctx.strokeStyle = 'red';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(start[0], start[1], end[0] - start[0], end[1] - start[1]);
-                    ctx.font = '16px Arial';
-                    ctx.fillStyle = 'red';
-                    ctx.fillText(obj, start[0], start[1] - 5);
+                    resultsText += `${obj}: Start(${start[0]}, ${start[1]}), End(${end[0]}, ${end[1]})<br>`;
                 }
-
-                resultsDiv.innerHTML = 'Annotations added!';
+                resultsDiv.innerHTML = resultsText;
             }
         })
         .catch(error => {

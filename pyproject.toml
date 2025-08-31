@@ -4,4 +4,12 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = []
+dependencies = [
+    "load_dotenv",
+    "google-genai",
+    "flask>=3.1.2",
+    "flask-cors>=6.0.1",
+    "pillow>=11.3.0",
+    "opencv-python>=4.11.0.86",
+    "numpy>=2.0.2",
+]
