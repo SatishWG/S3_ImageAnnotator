@@ -44,8 +44,12 @@ def parse_json(json_output: str):
 
 def extract_segmentation_masks(image_path: str, output_dir: str = "segmentation_outputs"):
     try:
-        # Load and resize image
-        im = Image.open(image_path)
+        # Load and get original image size before resizing
+        original_image = Image.open(image_path)
+        original_width, original_height = original_image.size
+        
+        # Create thumbnail for processing
+        im = original_image.copy()
         im.thumbnail([1024, 1024], Image.Resampling.LANCZOS)
         print(f"Image size after thumbnail: {im.size}")
 
@@ -79,12 +83,14 @@ def extract_segmentation_masks(image_path: str, output_dir: str = "segmentation_
 
         # Process each mask
         for i, item in enumerate(items):
-            # Get bounding box coordinates
+            # Get normalized bounding box coordinates
             box = item["box_2d"]
-            y0 = int(box[0] / 1000 * im.size[1])
-            x0 = int(box[1] / 1000 * im.size[0])
-            y1 = int(box[2] / 1000 * im.size[1])
-            x1 = int(box[3] / 1000 * im.size[0])
+            
+            # Convert normalized coordinates (0-1000) to original image pixels
+            y0 = int(box[0] / 1000 * original_height)
+            x0 = int(box[1] / 1000 * original_width)
+            y1 = int(box[2] / 1000 * original_height)
+            x1 = int(box[3] / 1000 * original_width)
 
             # Skip invalid boxes
             if y0 >= y1 or x0 >= x1:
@@ -95,38 +101,25 @@ def extract_segmentation_masks(image_path: str, output_dir: str = "segmentation_
             if not png_str.startswith("data:image/png;base64,"):
                 continue
 
-            # Remove prefix
+            # Remove prefix and decode base64
             png_str = png_str.removeprefix("data:image/png;base64,")
             mask_data = base64.b64decode(png_str)
             mask = Image.open(io.BytesIO(mask_data))
 
-            # Resize mask to match bounding box
+            # Resize mask to match actual bounding box size
             mask = mask.resize((x1 - x0, y1 - y0), Image.Resampling.BILINEAR)
 
-            # Convert mask to numpy array for processing
-            mask_array = np.array(mask)
-
-            # Create overlay for this mask
-            overlay = Image.new('RGBA', im.size, (0, 0, 0, 0))
-            overlay_draw = ImageDraw.Draw(overlay)
-
-            # Create overlay for the mask
-            color = (255, 255, 255, 200)
-            for y in range(y0, y1):
-                for x in range(x0, x1):
-                    if mask_array[y - y0, x - x0] > 128:  # Threshold for mask
-                        overlay_draw.point((x, y), fill=color)
-
-            # Save individual mask and its overlay
+            # Save mask with original image coordinates
             mask_filename = f"{item['label']}_{i}_mask.png"
-            overlay_filename = f"{item['label']}_{i}_overlay.png"
+            mask_path = os.path.join(output_dir, mask_filename)
+            mask.save(mask_path)
 
-            mask.save(os.path.join(output_dir, mask_filename))
+            # Create a full-size mask for the original image
+            full_mask = Image.new('L', (original_width, original_height), 0)
+            full_mask.paste(mask, (x0, y0))
+            full_mask.save(mask_path)
 
-            # Create and save overlay
-            composite = Image.alpha_composite(im.convert('RGBA'), overlay)
-            composite.save(os.path.join(output_dir, overlay_filename))
-            print(f"Saved mask and overlay for {item['label']} to {output_dir}")
+            print(f"Saved mask for {item['label']} at coordinates ({x0}, {y0}, {x1}, {y1})")
 
     except Exception as e:
         print(f"Error in extract_segmentation_masks: {str(e)}")

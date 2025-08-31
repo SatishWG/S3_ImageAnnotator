@@ -23,32 +23,30 @@ def process_image(image_path, objects):
     Process image using Gemini 2.0 Flash for object detection
     """
     try:
-        # Create a directory for segmentation outputs
+        # Get original image dimensions
+        with Image.open(image_path) as img:
+            original_width, original_height = img.size
+            print(f"Original image dimensions: {img.size}")
+
+        # Create segmentation output directory
         output_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'segmentation')
         os.makedirs(output_dir, exist_ok=True)
-        print(f"Output directory: {output_dir}")
         
-        # Extract segmentation masks
+        # Extract segmentation masks with original dimensions
         extract_segmentation_masks(image_path, output_dir)
-        print("Segmentation masks extracted")
         
-        # Process the results
+        # Process results
         detected_objects = {}
-        
-        # Clean up the input objects (strip whitespace and convert to lowercase)
         clean_objects = [obj.strip().lower() for obj in objects]
         
-        # Look for mask files in the output directory
+        # Look for mask files
         mask_files = [f for f in os.listdir(output_dir) if f.endswith('_mask.png')]
-        print(f"Found mask files: {mask_files}")
         
         for filename in mask_files:
-            # Extract object label from filename (everything before first underscore)
             label = filename.split('_')[0].lower()
             
-            # If this object was requested by the user
             if any(obj in label for obj in clean_objects):
-                original_label = filename.split('_')[0]  # Keep original case for display
+                original_label = filename.split('_')[0]
                 mask_path = os.path.join(output_dir, filename)
                 
                 with Image.open(mask_path) as mask:
@@ -58,8 +56,8 @@ def process_image(image_path, objects):
                             detected_objects[original_label] = []
                         
                         detected_objects[original_label].append([
-                            (bbox[0], bbox[1]),  # top-left
-                            (bbox[2], bbox[3])   # bottom-right
+                            (bbox[0], bbox[1]),  # Original top-left coordinates
+                            (bbox[2], bbox[3])   # Original bottom-right coordinates
                         ])
         
         return detected_objects

@@ -14,12 +14,21 @@ function drawBoundingBoxes(detectedObjects) {
     const canvas = annotationCanvas;
     const ctx = canvas.getContext('2d');
     
-    // Clear previous drawings
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Get the original image dimensions
+    const originalWidth = uploadedImage.naturalWidth;
+    const originalHeight = uploadedImage.naturalHeight;
     
-    // Set canvas size to match image
-    canvas.width = uploadedImage.width;
-    canvas.height = uploadedImage.height;
+    // Get the displayed image dimensions
+    const displayWidth = uploadedImage.offsetWidth;
+    const displayHeight = uploadedImage.offsetHeight;
+    
+    // Set canvas size to match displayed image size
+    canvas.width = displayWidth;
+    canvas.height = displayHeight;
+    
+    // Calculate scaling factors
+    const scaleX = displayWidth / originalWidth;
+    const scaleY = displayHeight / originalHeight;
     
     // Draw bounding boxes
     Object.entries(detectedObjects).forEach(([label, instances]) => {
@@ -32,17 +41,34 @@ function drawBoundingBoxes(detectedObjects) {
         
         instances.forEach((coords, index) => {
             const [topLeft, bottomRight] = coords;
-            const width = bottomRight[0] - topLeft[0];
-            const height = bottomRight[1] - topLeft[1];
+            
+            // Scale coordinates to match displayed image size
+            const scaledX = topLeft[0] * scaleX;
+            const scaledY = topLeft[1] * scaleY;
+            const scaledWidth = (bottomRight[0] - topLeft[0]) * scaleX;
+            const scaledHeight = (bottomRight[1] - topLeft[1]) * scaleY;
             
             // Draw rectangle
-            ctx.strokeRect(topLeft[0], topLeft[1], width, height);
+            ctx.strokeRect(scaledX, scaledY, scaledWidth, scaledHeight);
             
             // Draw label
-            ctx.fillText(`${label} ${index + 1}`, topLeft[0], topLeft[1] - 5);
+            ctx.fillText(`${label} ${index + 1}`, scaledX, scaledY - 5);
         });
     });
 }
+
+// Update the image onload event to redraw boxes when image size changes
+uploadedImage.onload = function() {
+    if (imageUrl) {
+        // Wait for next frame to ensure image dimensions are updated
+        requestAnimationFrame(() => {
+            const data = JSON.parse(annotationsPanel.dataset.lastDetection || '{}');
+            if (data.detected_objects) {
+                drawBoundingBoxes(data.detected_objects);
+            }
+        });
+    }
+};
 
 function updateAnnotationsPanel(detectedObjects) {
     let html = '<h3>Detected Objects</h3>';
@@ -121,6 +147,8 @@ annotateForm.addEventListener('submit', function (e) {
         } else if (data.warning) {
             annotationsPanel.innerHTML = `Warning: ${data.warning}`;
         } else {
+            // Store the detection results for resize handling
+            annotationsPanel.dataset.lastDetection = JSON.stringify(data);
             drawBoundingBoxes(data.detected_objects);
             updateAnnotationsPanel(data.detected_objects);
         }
