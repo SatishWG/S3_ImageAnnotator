@@ -92,12 +92,31 @@ function updateAnnotationsPanel(detectedObjects) {
     annotationsPanel.innerHTML = html;
 }
 
+function clearAnnotations() {
+    // Clear canvas
+    const canvas = annotationCanvas;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Clear annotations panel
+    annotationsPanel.innerHTML = '';
+    
+    // Clear stored detection data
+    delete annotationsPanel.dataset.lastDetection;
+    
+    // Hide annotate form
+    annotateForm.style.display = 'none';
+}
+
 uploadForm.addEventListener('submit', function (e) {
     e.preventDefault();
     
     const file = fileInput.files[0];
     const formData = new FormData();
     formData.append('file', file);
+    
+    // Clear existing annotations before uploading
+    clearAnnotations();
     
     fetch('/upload', {
         method: 'POST',
@@ -112,7 +131,6 @@ uploadForm.addEventListener('submit', function (e) {
             uploadedImage.src = imageUrl;
             uploadedImage.style.display = 'block';
             annotateForm.style.display = 'block';
-            annotationsPanel.innerText = '';
         }
     })
     .catch(error => {

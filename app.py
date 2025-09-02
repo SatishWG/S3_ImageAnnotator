@@ -4,6 +4,7 @@ from werkzeug.utils import secure_filename
 from objectSegmentation import extract_segmentation_masks
 import json
 from PIL import Image
+import shutil
 
 app = Flask(__name__)
 
@@ -68,6 +69,25 @@ def process_image(image_path, objects):
         traceback.print_exc()
         return {}
 
+def cleanup_directories():
+    """Clean up segmentation and uploads directories"""
+    try:
+        # Clean segmentation directory
+        segmentation_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'segmentation')
+        if os.path.exists(segmentation_dir):
+            shutil.rmtree(segmentation_dir)
+            os.makedirs(segmentation_dir)
+
+        # Clean uploads directory except segmentation folder
+        uploads_dir = app.config['UPLOAD_FOLDER']
+        for item in os.listdir(uploads_dir):
+            item_path = os.path.join(uploads_dir, item)
+            if item != 'segmentation' and os.path.isfile(item_path):
+                os.remove(item_path)
+
+    except Exception as e:
+        print(f"Error cleaning directories: {e}")
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -76,15 +96,19 @@ def index():
 def upload_file():
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'})
+    
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'No selected file'})
+    
     if file and allowed_file(file.filename):
+        # Clean up before uploading new image
+        cleanup_directories()
+        
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
 
-        # Return the image URL
         return jsonify({'image_url': url_for('static', filename=f'uploads/{filename}')})
 
     return jsonify({'error': 'File type not allowed'})
