@@ -134,7 +134,45 @@ uploadForm.addEventListener('submit', function (e) {
     });
 });
 
-// Replace the existing annotate form event listener
+// Add this helper function after existing function declarations
+function removeDuplicateInstances(detectedObjects) {
+    const tolerance = 5;
+    
+    function areCoordinatesSame(coords1, coords2) {
+        const [tl1, br1] = coords1;
+        const [tl2, br2] = coords2;
+        return (
+            Math.abs(tl1[0] - tl2[0]) <= tolerance &&
+            Math.abs(tl1[1] - tl2[1]) <= tolerance &&
+            Math.abs(br1[0] - br2[0]) <= tolerance &&
+            Math.abs(br1[1] - br2[1]) <= tolerance
+        );
+    }
+    
+    const result = {};
+    
+    for (const [label, instances] of Object.entries(detectedObjects)) {
+        if (!instances.length) continue;
+        
+        const uniqueInstances = [instances[0]];
+        
+        for (let i = 1; i < instances.length; i++) {
+            const instance = instances[i];
+            const isDuplicate = uniqueInstances.some(
+                uniqueInstance => areCoordinatesSame(instance, uniqueInstance)
+            );
+            if (!isDuplicate) {
+                uniqueInstances.push(instance);
+            }
+        }
+        
+        result[label] = uniqueInstances;
+    }
+    
+    return result;
+}
+
+// Modify the annotate form submit handler
 annotateForm.addEventListener('submit', function (e) {
     e.preventDefault();
     
@@ -148,9 +186,7 @@ annotateForm.addEventListener('submit', function (e) {
         return;
     }
     
-    // Clear previous annotations
     clearAnnotations();
-    
     annotationsPanel.innerText = 'Processing...';
     
     fetch('/annotate', {
@@ -170,14 +206,17 @@ annotateForm.addEventListener('submit', function (e) {
         } else if (data.warning) {
             annotationsPanel.innerHTML = `Warning: ${data.warning}`;
         } else {
-            // Store only the current detection results
+            // Remove any duplicate instances
+            const deDupedObjects = removeDuplicateInstances(data.detected_objects);
+            
+            // Store de-duped results
             annotationsPanel.dataset.lastDetection = JSON.stringify({
-                detected_objects: {...data.detected_objects}
+                detected_objects: deDupedObjects
             });
             
-            // Update display
-            drawBoundingBoxes(data.detected_objects);
-            updateAnnotationsPanel(data.detected_objects);
+            // Update display with de-duped objects
+            drawBoundingBoxes(deDupedObjects);
+            updateAnnotationsPanel(deDupedObjects);
         }
     })
     .catch(error => {

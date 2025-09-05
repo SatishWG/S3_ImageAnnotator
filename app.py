@@ -23,6 +23,37 @@ app.detected_objects_cache = {}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def are_coordinates_same(coords1, coords2, tolerance=5):
+    """Compare two sets of coordinates with some tolerance"""
+    [tl1, br1] = coords1
+    [tl2, br2] = coords2
+    return (abs(tl1[0] - tl2[0]) <= tolerance and 
+            abs(tl1[1] - tl2[1]) <= tolerance and
+            abs(br1[0] - br2[0]) <= tolerance and
+            abs(br1[1] - br2[1]) <= tolerance)
+
+def remove_duplicate_instances(objects_dict):
+    """Remove instances with duplicate coordinates"""
+    for label, instances in objects_dict.items():
+        if not instances:
+            continue
+            
+        unique_instances = [instances[0]]  # Keep first instance
+        
+        # Compare against existing unique instances
+        for instance in instances[1:]:
+            is_duplicate = False
+            for unique_instance in unique_instances:
+                if are_coordinates_same(instance, unique_instance):
+                    is_duplicate = True
+                    break
+            if not is_duplicate:
+                unique_instances.append(instance)
+        
+        objects_dict[label] = unique_instances
+    
+    return objects_dict
+
 def process_image(image_path, objects):
     """Process image using Gemini 2.0 Flash for object detection"""
     try:
@@ -89,6 +120,8 @@ def process_image(image_path, objects):
             # Merge new detections with cached ones
             detected_objects.update(new_detected)
         
+        # Before returning detected_objects, remove duplicates
+        detected_objects = remove_duplicate_instances(detected_objects)
         return detected_objects
                 
     except Exception as e:
