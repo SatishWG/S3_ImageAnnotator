@@ -54,7 +54,7 @@ def extract_segmentation_masks(image_path: str, output_dir: str = "segmentation_
         print(f"Image size after thumbnail: {im.size}")
 
         prompt = """
-        Analyze this image and provide segmentation masks for all visible objects.
+        Analyze this image and provide segmentation masks for all visible objects. Ignore any text visible in the image.
         Return the results as a JSON array where each object has:
         - "label": descriptive name of the object
         - "box_2d": bounding box coordinates [y0, x0, y1, x1] normalized to 1000x1000

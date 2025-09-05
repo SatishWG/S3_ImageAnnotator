@@ -9,6 +9,7 @@ const annotationCanvas = document.getElementById('annotation-canvas');
 const annotationsPanel = document.getElementById('annotations-panel');
 
 let imageUrl = '';
+let lastAnnotationObjects = new Set();
 
 function drawBoundingBoxes(detectedObjects) {
     const canvas = annotationCanvas;
@@ -93,19 +94,13 @@ function updateAnnotationsPanel(detectedObjects) {
 }
 
 function clearAnnotations() {
-    // Clear canvas
     const canvas = annotationCanvas;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Clear annotations panel
     annotationsPanel.innerHTML = '';
-    
-    // Clear stored detection data
     delete annotationsPanel.dataset.lastDetection;
-    
-    // Hide annotate form
-    annotateForm.style.display = 'none';
+    lastAnnotationObjects.clear();  // Clear the set of annotated objects
 }
 
 uploadForm.addEventListener('submit', function (e) {
@@ -139,6 +134,7 @@ uploadForm.addEventListener('submit', function (e) {
     });
 });
 
+// Replace the existing annotate form event listener
 annotateForm.addEventListener('submit', function (e) {
     e.preventDefault();
     
@@ -148,6 +144,9 @@ annotateForm.addEventListener('submit', function (e) {
         annotationsPanel.innerText = 'Please enter at least one object to detect.';
         return;
     }
+    
+    // Always clear previous annotations when starting a new detection
+    clearAnnotations();
     
     annotationsPanel.innerText = 'Processing...';
     
@@ -165,8 +164,10 @@ annotateForm.addEventListener('submit', function (e) {
         } else if (data.warning) {
             annotationsPanel.innerHTML = `Warning: ${data.warning}`;
         } else {
-            // Store the detection results for resize handling
+            // Store the new detection results
             annotationsPanel.dataset.lastDetection = JSON.stringify(data);
+            
+            // Update display with only the current detection results
             drawBoundingBoxes(data.detected_objects);
             updateAnnotationsPanel(data.detected_objects);
         }

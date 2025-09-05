@@ -5,6 +5,7 @@ from objectSegmentation import extract_segmentation_masks
 import json
 from PIL import Image
 import shutil
+from collections import defaultdict
 
 app = Flask(__name__)
 
@@ -16,53 +17,69 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # Ensure the upload folder exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# Store detected objects per image
+app.detected_objects_cache = {}
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def process_image(image_path, objects):
-    """
-    Process image using Gemini 2.0 Flash for object detection
-    """
+    """Process image using Gemini 2.0 Flash for object detection"""
     try:
-        # Get original image dimensions
-        with Image.open(image_path) as img:
-            original_width, original_height = img.size
-            print(f"Original image dimensions: {img.size}")
+        image_key = os.path.basename(image_path)
+        clean_objects = [obj.strip().lower() for obj in objects]
+        
+        # Get only the requested objects from cache
+        if image_key in app.detected_objects_cache:
+            cached_objects = app.detected_objects_cache[image_key]
+            filtered_objects = {}
+            
+            # Return only the currently requested objects
+            for label, instances in cached_objects.items():
+                if any(obj in label.lower() for obj in clean_objects):
+                    filtered_objects[label] = instances
+            
+            # If we found all requested objects in cache, return them
+            if filtered_objects and all(any(obj in label.lower() 
+                for label in filtered_objects.keys()) for obj in clean_objects):
+                return filtered_objects
 
-        # Create segmentation output directory
+        # Process new objects
         output_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'segmentation')
         os.makedirs(output_dir, exist_ok=True)
         
-        # Extract segmentation masks with original dimensions
+        # Extract masks for new detection
         extract_segmentation_masks(image_path, output_dir)
         
-        # Process results
+        # Process results for requested objects only
         detected_objects = {}
-        clean_objects = [obj.strip().lower() for obj in objects]
-        
-        # Look for mask files
         mask_files = [f for f in os.listdir(output_dir) if f.endswith('_mask.png')]
         
         for filename in mask_files:
             label = filename.split('_')[0].lower()
             
+            # Only process if it's one of the requested objects
             if any(obj in label for obj in clean_objects):
                 original_label = filename.split('_')[0]
                 mask_path = os.path.join(output_dir, filename)
                 
                 with Image.open(mask_path) as mask:
-                    bbox = mask.getbbox()  # Returns (left, top, right, bottom)
+                    bbox = mask.getbbox()
                     if bbox:
                         if original_label not in detected_objects:
                             detected_objects[original_label] = []
-                        
-                        detected_objects[original_label].append([
-                            (bbox[0], bbox[1]),  # Original top-left coordinates
-                            (bbox[2], bbox[3])   # Original bottom-right coordinates
-                        ])
+                        detected_objects[original_label].append(
+                            [(bbox[0], bbox[1]), (bbox[2], bbox[3])]
+                        )
         
+        # Update cache with new detections
+        if image_key not in app.detected_objects_cache:
+            app.detected_objects_cache[image_key] = {}
+        app.detected_objects_cache[image_key].update(detected_objects)
+        
+        # Return only the currently requested objects
         return detected_objects
-    
+                
     except Exception as e:
         print(f"Error in process_image: {str(e)}")
         import traceback
@@ -72,6 +89,9 @@ def process_image(image_path, objects):
 def cleanup_directories():
     """Clean up segmentation and uploads directories"""
     try:
+        # Clear the objects cache when cleaning up
+        app.detected_objects_cache.clear()
+        
         # Clean segmentation directory
         segmentation_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'segmentation')
         if os.path.exists(segmentation_dir):
@@ -104,6 +124,8 @@ def upload_file():
     if file and allowed_file(file.filename):
         # Clean up before uploading new image
         cleanup_directories()
+        # Clear the objects cache for the new image
+        app.detected_objects_cache.clear()
         
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
