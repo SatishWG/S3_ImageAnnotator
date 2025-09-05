@@ -138,14 +138,17 @@ uploadForm.addEventListener('submit', function (e) {
 annotateForm.addEventListener('submit', function (e) {
     e.preventDefault();
     
-    const objects = objectsInput.value.split(',').map(obj => obj.trim()).filter(obj => obj);
+    const objects = objectsInput.value
+        .split(',')
+        .map(obj => obj.trim())
+        .filter(obj => obj);
     
     if (objects.length === 0) {
         annotationsPanel.innerText = 'Please enter at least one object to detect.';
         return;
     }
     
-    // Always clear previous annotations when starting a new detection
+    // Clear previous annotations
     clearAnnotations();
     
     annotationsPanel.innerText = 'Processing...';
@@ -155,7 +158,10 @@ annotateForm.addEventListener('submit', function (e) {
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ objects, image_url: imageUrl })
+        body: JSON.stringify({ 
+            objects,
+            image_url: imageUrl
+        })
     })
     .then(response => response.json())
     .then(data => {
@@ -164,10 +170,12 @@ annotateForm.addEventListener('submit', function (e) {
         } else if (data.warning) {
             annotationsPanel.innerHTML = `Warning: ${data.warning}`;
         } else {
-            // Store the new detection results
-            annotationsPanel.dataset.lastDetection = JSON.stringify(data);
+            // Store only the current detection results
+            annotationsPanel.dataset.lastDetection = JSON.stringify({
+                detected_objects: {...data.detected_objects}
+            });
             
-            // Update display with only the current detection results
+            // Update display
             drawBoundingBoxes(data.detected_objects);
             updateAnnotationsPanel(data.detected_objects);
         }

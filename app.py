@@ -29,29 +29,30 @@ def process_image(image_path, objects):
         image_key = os.path.basename(image_path)
         clean_objects = [obj.strip().lower() for obj in objects]
         
-        # Get only the requested objects from cache
+        # Initialize detected_objects
+        detected_objects = {}
+        
+        # First check cache
         if image_key in app.detected_objects_cache:
             cached_objects = app.detected_objects_cache[image_key]
-            filtered_objects = {}
             
-            # Return only the currently requested objects
+            # Return only currently requested objects from cache
             for label, instances in cached_objects.items():
                 if any(obj in label.lower() for obj in clean_objects):
-                    filtered_objects[label] = instances
+                    detected_objects[label] = instances.copy()  # Make a copy of instances
             
-            # If we found all requested objects in cache, return them
-            if filtered_objects:
-                return filtered_objects
+            # If all requested objects are found in cache, return them
+            if detected_objects and all(any(obj in label.lower() 
+                for label in detected_objects.keys()) for obj in clean_objects):
+                return detected_objects
 
-        # Process new objects that aren't in cache
-        new_objects = []
+        # Find objects not in cache
+        cached_labels = set()
         if image_key in app.detected_objects_cache:
-            # Only process objects that aren't already in cache
             cached_labels = {label.lower() for label in app.detected_objects_cache[image_key].keys()}
-            new_objects = [obj for obj in clean_objects 
-                         if not any(obj in cached_label for cached_label in cached_labels)]
-        else:
-            new_objects = clean_objects
+        
+        new_objects = [obj for obj in clean_objects 
+                      if not any(obj in label for label in cached_labels)]
 
         if new_objects:
             output_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'segmentation')
@@ -60,14 +61,13 @@ def process_image(image_path, objects):
             # Extract masks for new detection
             extract_segmentation_masks(image_path, output_dir)
             
-            # Process results for requested objects only
-            detected_objects = {}
+            # Process new masks
             mask_files = [f for f in os.listdir(output_dir) if f.endswith('_mask.png')]
+            new_detected = {}
             
             for filename in mask_files:
                 label = filename.split('_')[0].lower()
                 
-                # Only process if it's one of the new objects
                 if any(obj in label for obj in new_objects):
                     original_label = filename.split('_')[0]
                     mask_path = os.path.join(output_dir, filename)
@@ -75,25 +75,21 @@ def process_image(image_path, objects):
                     with Image.open(mask_path) as mask:
                         bbox = mask.getbbox()
                         if bbox:
-                            if original_label not in detected_objects:
-                                detected_objects[original_label] = []
-                            detected_objects[original_label].append(
+                            if original_label not in new_detected:
+                                new_detected[original_label] = []
+                            new_detected[original_label].append(
                                 [(bbox[0], bbox[1]), (bbox[2], bbox[3])]
                             )
             
             # Update cache with new detections
             if image_key not in app.detected_objects_cache:
                 app.detected_objects_cache[image_key] = {}
-            app.detected_objects_cache[image_key].update(detected_objects)
+            app.detected_objects_cache[image_key].update(new_detected)
             
-            # Combine cached and new detections
-            if image_key in app.detected_objects_cache:
-                return {label: instances for label, instances in app.detected_objects_cache[image_key].items()
-                        if any(obj in label.lower() for obj in clean_objects)}
-            
-            return detected_objects
-                    
-        return {}
+            # Merge new detections with cached ones
+            detected_objects.update(new_detected)
+        
+        return detected_objects
                 
     except Exception as e:
         print(f"Error in process_image: {str(e)}")

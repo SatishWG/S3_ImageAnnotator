@@ -7,11 +7,53 @@ import json
 import numpy as np
 import os
 import load_dotenv
+from difflib import get_close_matches
+import re
 
 load_dotenv.load_dotenv()  # take environment variables from .env.
 os.environ.get('GOOGLE_API_KEY')
 
 client = genai.Client()
+
+COMMON_SYNONYMS = {
+    'vegetables': ['veggie', 'veg', 'vegetable'],
+    'tomato': ['tomatoes', 'tomatos', 'tomatoe'],
+    'potato': ['potatoes', 'potatos', 'potatoe'],
+    'carrot': ['carrots', 'carot', 'carots'],
+    'pepper': ['peppers', 'capsicum', 'bell pepper', 'chili'],
+    'onion': ['onions', 'unions'],
+    'cucumber': ['cucumbers', 'cucumbre'],
+    'broccoli': ['brocoli', 'brocolli', 'broccolli'],
+    'cauliflower': ['cauliflour', 'cauli'],
+    'lettuce': ['letuce', 'lettus', 'lattuce'],
+    'zucchini': ['zuchini', 'courgette', 'zuccini'],
+    # Add more synonyms as needed
+}
+
+def find_matching_label(query: str, available_labels: list) -> str:
+    """Find the best matching label for a given query"""
+    query = query.lower()
+    
+    # Check exact match first
+    for label in available_labels:
+        if query == label.lower():
+            return label
+            
+    # Check synonyms
+    for standard_name, variations in COMMON_SYNONYMS.items():
+        if query in variations or standard_name.lower() == query:
+            for label in available_labels:
+                if standard_name.lower() in label.lower():
+                    return label
+    
+    # Try fuzzy matching
+    matches = get_close_matches(query, [label.lower() for label in available_labels], n=1, cutoff=0.6)
+    if matches:
+        for label in available_labels:
+            if label.lower() == matches[0]:
+                return label
+                
+    return None
 
 def parse_json(json_output: str):
     """Parse JSON output from Gemini model response"""
@@ -120,6 +162,20 @@ def extract_segmentation_masks(image_path: str, output_dir: str = "segmentation_
             full_mask.save(mask_path)
 
             print(f"Saved mask for {item['label']} at coordinates ({x0}, {y0}, {x1}, {y1})")
+
+        # After getting items from JSON response
+        processed_items = []
+        for item in items:
+            # Store original label
+            original_label = item['label']
+            # Add the item with its original label to processed items
+            processed_items.append({
+                'label': original_label,
+                'box_2d': item['box_2d'],
+                'mask': item['mask']
+            })
+
+        items = processed_items
 
     except Exception as e:
         print(f"Error in extract_segmentation_masks: {str(e)}")
